@@ -1,6 +1,7 @@
 import os
 from discord.ext import commands
 from discord.ext.commands import Context
+from discord import app_commands
 from utils.embeds import success_embed, error_embed, warning_embed, info_embed
 from utils.permissions import is_admin, is_allowed_channel, send_to_channel
 from views.request_code_view import RequestCodeView
@@ -13,63 +14,87 @@ class CodeManager(commands.Cog, name="Code Manager"):
 
     @is_admin()
     @is_allowed_channel()
-    @commands.hybrid_command(name="set_code", description="Set or update a server-wide code and post the request button.")
-    async def set_code(self, ctx: Context, *, new_code: str = None):
-
+    @commands.hybrid_command(name="set_code", description="Set or update a code for a specific tournament.")
+    @app_commands.describe(
+        tournament_id="A unique ID for the tournament (e.g. celestial_guardians)",
+        tournament_name="Full name of the tournament",
+        new_code="Access code to assign"
+    )
+    async def set_code(self, ctx: Context, tournament_id: str, tournament_name: str, new_code: str):
         server_id = ctx.guild.id
         db = self.bot.database
-        current_code = await db.get_code(server_id)
 
-        if current_code and not new_code:
-            await ctx.send(
-                embed=warning_embed("Code Already Exists", f"Use {os.getenv('PREFIX')}generate_code <new_code> to overwrite it."),
-                ephemeral=True
-            )
-            return
+        await db.set_code(server_id, tournament_id, new_code, tournament_name)
 
-        if new_code:
-            await db.set_code(server_id, new_code)
-            await ctx.send(embed=success_embed("Code Updated", f"The code is now: {new_code}"), ephemeral=True)
-        elif not current_code:
-            await ctx.send(embed=error_embed("No Code Set", "Please provide a code."), ephemeral=True)
-            return
+        await ctx.send(embed=success_embed(
+            "Code Updated",
+            f"🔐 Code: `{new_code}`\n🏆 Tournament: **{tournament_name}** (`{tournament_id}`)"
+        ), ephemeral=True)
 
-        embed_request, view = RequestCodeView.create(database=db, server_id=ctx.guild.id)
+        embed, view = RequestCodeView.create(
+            database=db,
+            tournament_id=tournament_id,
+            tournament_name=tournament_name
+        )
+
+        self.bot.add_view(view)  # rende la view persistente
 
         await send_to_channel(
             ctx,
             guild=ctx.guild,
             bot=self.bot,
-            embed=embed_request,
+            embed=embed,
             view=view,
             channel_id=CODE_CHANNEL_ID
         )
 
     @is_admin()
     @is_allowed_channel()
-    @commands.hybrid_command(name="get_code", description="Retrieve the currently stored code.")
-    async def get_code(self, ctx: Context):
-        code = await self.bot.database.get_code(ctx.guild.id)
+    @commands.hybrid_command(name="get_code", description="Retrieve a stored tournament code.")
+    @app_commands.describe(tournament_id="Tournament ID to retrieve the code for")
+    async def get_code(self, ctx: Context, tournament_id: str):
+        code = await self.bot.database.get_code(ctx.guild.id, tournament_id)
 
         if code:
-            await ctx.send(embed=info_embed("Stored Code", f"{code}"), ephemeral=True)
+            await ctx.send(embed=info_embed("Stored Code", f"`{code}`"), ephemeral=True)
         else:
-            await ctx.send(embed=error_embed("No Code Set", "No code found."), ephemeral=True)
+            await ctx.send(embed=error_embed("No Code Found", f"No code found for `{tournament_id}`."), ephemeral=True)
 
     @is_admin()
     @is_allowed_channel()
-    @commands.hybrid_command(name="delete_code", description="Delete the currently stored code.")
-    async def delete_code(self, ctx: Context):
+    @commands.hybrid_command(name="delete_code", description="Delete a tournament code.")
+    @app_commands.describe(tournament_id="Tournament ID to delete the code for")
+    async def delete_code(self, ctx: Context, tournament_id: str):
         server_id = ctx.guild.id
         db = self.bot.database
-        current_code = await db.get_code(server_id)
+        code = await db.get_code(server_id, tournament_id)
 
-        if not current_code:
-            await ctx.send(embed=error_embed("No Code Set", "No code found."), ephemeral=True)
+        if not code:
+            await ctx.send(embed=error_embed("No Code Found", f"No code found for `{tournament_id}`."), ephemeral=True)
             return
 
-        await db.delete_code(server_id)
-        await ctx.send(embed=success_embed("Code Deleted", "The code has been deleted."), ephemeral=True)
+        await db.delete_code(server_id, tournament_id)
+        await ctx.send(embed=success_embed("Code Deleted", f"Code for `{tournament_id}` has been removed."), ephemeral=True)
+
+    @is_admin()
+    @is_allowed_channel()
+    @commands.hybrid_command(name="list_codes", description="List all active tournament codes.")
+    async def list_codes(self, ctx: Context):
+        server_id = ctx.guild.id
+        db = self.bot.database
+        tournaments = await db.list_codes(server_id)
+
+        if not tournaments:
+            await ctx.send(embed=info_embed("No Active Codes", "There are no codes currently stored."), ephemeral=True)
+            return
+
+        description = "\n".join([f"• **{name}** (`{tid}`)" for tid, name in tournaments])
+
+        embed = info_embed(
+            "Active Tournament Codes",
+            description
+        )
+        await ctx.send(embed=embed, ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(CodeManager(bot))

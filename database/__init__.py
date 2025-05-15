@@ -87,44 +87,40 @@ class DatabaseManager:
                 result_list.append(row)
             return result_list
 
-    async def set_code(self, server_id: int, code: str) -> None:
+    async def get_code(self, server_id: int, tournament_id: str) -> str | None:
         """
-        Inserisce o aggiorna il codice univoco per il server.
+        Recupera il codice per un torneo specifico nel server.
         """
+        cursor = await self.connection.execute(
+            "SELECT code FROM codes WHERE server_id = ? AND tournament_id = ?",
+            (server_id, tournament_id)
+        )
+        row = await cursor.fetchone()
+        return row[0] if row else None
+
+    async def set_code(self, server_id: int, tournament_id: str, code: str, tournament_name: str) -> None:
         await self.connection.execute(
-            "INSERT INTO codes (server_id, code) VALUES (?, ?) ON CONFLICT(server_id) DO UPDATE SET code=excluded.code, created_at=CURRENT_TIMESTAMP",
-            (server_id, code)
+            """
+            INSERT INTO codes (server_id, tournament_id, code, tournament_name)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(server_id, tournament_id) DO UPDATE SET
+                code = excluded.code,
+                tournament_name = excluded.tournament_name,
+                created_at = CURRENT_TIMESTAMP
+            """,
+            (server_id, tournament_id, code, tournament_name)
         )
         await self.connection.commit()
 
-    async def get_code(self, server_id: int) -> str:
-        """
-        Recupera il codice per il server.
-        """
-        rows = await self.connection.execute(
-            "SELECT code FROM codes WHERE server_id=?",
-            (server_id,)
-        )
-        async with rows as cursor:
-            result = await cursor.fetchone()
-            return result[0] if result else None
-
-
-    async def delete_code(self, server_id: int) -> None:
-        """
-        Rimuove il codice per il server.
-        """
+    async def delete_code(self, server_id: int, tournament_id: str) -> None:
         await self.connection.execute(
-            "DELETE FROM codes WHERE server_id=?",
-            (server_id,)
+            "DELETE FROM codes WHERE server_id = ? AND tournament_id = ?",
+            (server_id, tournament_id)
         )
         await self.connection.commit()
 
-    async def code_exists(self, server_id: int) -> bool:
-        """
-        Controlla se un codice è già salvato per il server.
-        """
-        code = await self.get_code(server_id)
+    async def code_exists(self, server_id: int, tournament_id: str) -> bool:
+        code = await self.get_code(server_id, tournament_id)
         return code is not None
 
     async def get_last_reaction(self, user_id: int, guild_id: int) -> float | None:
@@ -146,3 +142,13 @@ class DatabaseManager:
             (str(user_id), str(guild_id))
         )
         await self.connection.commit()
+
+    async def list_codes(self, server_id: int) -> list[tuple[str, str]]:
+        """
+        Restituisce una lista di (tournament_id, tournament_name) con codice attivo per il server.
+        """
+        cursor = await self.connection.execute(
+            "SELECT tournament_id, tournament_name FROM codes WHERE server_id = ? ORDER BY created_at DESC",
+            (server_id,)
+        )
+        return await cursor.fetchall()

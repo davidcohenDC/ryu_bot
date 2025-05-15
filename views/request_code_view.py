@@ -1,65 +1,52 @@
 import discord
 from utils.embeds import create_embed, EMBED_COLOR_ERROR, EMBED_COLOR_INFO
 
-class RequestCodeView(discord.ui.View):
-    def __init__(self, database, server_id: int):
-        super().__init__(timeout=None)
-        self.database = database
-        self.server_id = server_id
 
-    @classmethod
-    def create(cls, database, server_id: int) -> tuple[discord.Embed, "RequestCodeView"]:
-        """
-        Factory per creare embed e view coerenti.
-        """
-        view = cls(database=database, server_id=server_id)
-        embed = cls.get_announcement_embed()
-        return embed, view
-
-    @staticmethod
-    def get_announcement_embed(
-        footer_text: str = "RYUZEN Tournament Bot"
-    ) -> discord.Embed:
-        return (
-            discord.Embed(
-                title="Request Access Code",
-                description=(
-                    "Click the button below to receive **your unique access code** via DM and here.\n\n"
-                    "> If DMs are disabled, you’ll still see the code here."
-                ),
-                color=EMBED_COLOR_INFO,
-            )
-            .set_footer(text=footer_text)
+class ClaimCodeButton(discord.ui.Button):
+    def __init__(self, database):
+        super().__init__(
+            label="🎟️ Claim Code",
+            style=discord.ButtonStyle.success,
+            custom_id="get_code_button"  # sarà modificato dinamicamente in View
         )
+        self.database = database
 
-    async def handle_code_claim(self, interaction: discord.Interaction):
-        code = await self.database.get_code(self.server_id)
+    async def callback(self, interaction: discord.Interaction):
+        try:
+            _, tournament_id = interaction.data["custom_id"].split("::")
+        except Exception:
+            await interaction.response.send_message(
+                "❌ Unable to determine the tournament.",
+                ephemeral=True
+            )
+            return
+
+        server_id = interaction.guild.id
+        code = await self.database.get_code(server_id, tournament_id)
 
         if not code:
             await interaction.response.send_message(
                 embed=create_embed(
                     "❌ No Code Available",
-                    "No code has been generated yet.",
-                    EMBED_COLOR_ERROR,
+                    f"No code set for `{tournament_id}`.",
+                    EMBED_COLOR_ERROR
                 ),
-                ephemeral=True,
+                ephemeral=True
             )
             return
 
-        # Send response
         await interaction.response.send_message(
             embed=create_embed(
-                "🔐 The Code",
+                "🔐 Your Code",
                 f"The code is: `{code}`\n\n> A copy has also been sent to your DMs (if enabled).",
-                EMBED_COLOR_INFO,
+                EMBED_COLOR_INFO
             ),
-            ephemeral=True,
+            ephemeral=True
         )
 
-        # Try DM
         try:
             embed_dm = discord.Embed(
-                title="Exclusive Code",
+                title=f"{tournament_id} – Exclusive Code",
                 description="You've successfully claimed the unique code. Keep it safe and private!",
                 color=EMBED_COLOR_INFO,
             )
@@ -70,10 +57,29 @@ class RequestCodeView(discord.ui.View):
         except discord.Forbidden:
             pass
 
-    @discord.ui.button(
-        label="🎟️ Claim Code", style=discord.ButtonStyle.success, custom_id="get_code_button"
-    )
-    async def get_code_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
-        await self.handle_code_claim(interaction)
+
+class RequestCodeView(discord.ui.View):
+    def __init__(self, database, tournament_id: str):
+        super().__init__(timeout=None)
+        btn = ClaimCodeButton(database)
+        btn.custom_id = f"get_code_button::{tournament_id}"
+        self.add_item(btn)
+
+    @classmethod
+    def create(cls, database, tournament_id: str, tournament_name: str) -> tuple[discord.Embed, "RequestCodeView"]:
+        view = cls(database, tournament_id)
+        embed = cls.get_announcement_embed(tournament_name)
+        return embed, view
+
+    @staticmethod
+    def get_announcement_embed(tournament_name: str) -> discord.Embed:
+        return (
+            discord.Embed(
+                title=f"{tournament_name} – Request Access Code",
+                description=(
+                    "Click the button below to receive **your unique access code** via DM and here.\n\n"
+                    "> If DMs are disabled, you’ll still see the code here."
+                ),
+                color=EMBED_COLOR_INFO,
+            ).set_footer(text="RYUZEN Tournament Bot")
+        )

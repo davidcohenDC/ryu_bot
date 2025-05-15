@@ -7,10 +7,13 @@ CREATE TABLE IF NOT EXISTS `warns` (
   `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS `codes` (
-  `server_id` VARCHAR(20) NOT NULL PRIMARY KEY,
-  `code` VARCHAR(255) NOT NULL,
-  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS codes (
+  server_id VARCHAR(20) NOT NULL,
+  tournament_id VARCHAR(50) NOT NULL,
+  tournament_name VARCHAR(255) NOT NULL,
+  code VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (server_id, tournament_id)
 );
 
 CREATE TABLE IF NOT EXISTS reaction_cooldowns (
