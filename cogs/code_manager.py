@@ -42,7 +42,7 @@ class CodeManager(commands.Cog, name="Code Manager"):
             bot=self.bot,
             embed=embed_request,
             view=view,
-            channel_name="log"
+            channel_id=1372333851640332418
         )
 
     @is_admin()

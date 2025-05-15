@@ -8,7 +8,7 @@ from discord.ext.commands import Context
 import random
 
 # === CONFIGURATION ===
-ANNOUNCE_CHANNEL_NAME = "log"
+ANNOUNCE_CHANNEL_ID = 1372333851640332418
 ALLOWED_ROLES = ["Owner", "RyuZen Team"]
 ALLOWED_COMMAND_CHANNEL_NAME = "bot-control"
 TRAINERS_ROLE_NAME = "Trainer"
@@ -217,7 +217,7 @@ class RoundControlView(discord.ui.View):
             await interaction.response.send_message("❌ Tutti i round sono già stati annunciati.", ephemeral=True)
             return
 
-        announce_channel = discord.utils.get(interaction.guild.text_channels, name=ANNOUNCE_CHANNEL_NAME)
+        announce_channel = interaction.guild.get_channel(ANNOUNCE_CHANNEL_ID)
         if not announce_channel:
             await interaction.response.send_message(f"❌ Canale `#{ANNOUNCE_CHANNEL_NAME}` non trovato.", ephemeral=True)
             return
@@ -409,8 +409,7 @@ class RoundAnnouncer(commands.Cog, name="Round Announcer"):
             member = result
             mention = member.mention
 
-        # 📢 Canale di annuncio
-        announce_channel = discord.utils.get(ctx.guild.text_channels, name=ANNOUNCE_CHANNEL_NAME)
+        announce_channel = ctx.guild.get_channel(ANNOUNCE_CHANNEL_ID)
         if not announce_channel:
             await ctx.send(embed=create_embed("❌ Channel Not Found", f"Canale `#{ANNOUNCE_CHANNEL_NAME}` non trovato.",
                                               EMBED_COLOR_ERROR), ephemeral=True)
@@ -479,7 +478,7 @@ class RoundAnnouncer(commands.Cog, name="Round Announcer"):
             )
             return
 
-        announce_channel = discord.utils.get(ctx.guild.text_channels, name=ANNOUNCE_CHANNEL_NAME)
+        announce_channel = ctx.guild.get_channel(ANNOUNCE_CHANNEL_ID)
         if not announce_channel:
             await ctx.send(
                 embed=create_embed("❌ Channel Not Found", f"Please create a channel named `#{ANNOUNCE_CHANNEL_NAME}`.", EMBED_COLOR_ERROR),

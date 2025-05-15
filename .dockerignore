@@ -6,3 +6,12 @@ venv/
 CODE_OF_CONDUCT.md
 CONTRIBUTING.md
 UPDATES.md
+
+_pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+.env
+.vscode/
+.idea/
