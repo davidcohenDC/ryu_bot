@@ -1,17 +1,6 @@
-"""
-Copyright © Krypton 2019-Present - https://github.com/kkrypt0nn (https://krypton.ninja)
-Description:
-🐍 A simple template to start to code your own and personalized Discord bot in Python
-
-Version: 6.3.0
-"""
-
-import json
 import logging
 import os
 import platform
-import random
-import sys
 
 import aiosqlite
 import discord
@@ -19,6 +8,8 @@ from discord.ext import commands, tasks
 from discord.ext.commands import Context
 from dotenv import load_dotenv
 
+from utils.embeds import error_embed
+from utils.permissions import MissingPermission, WrongChannel
 from database import DatabaseManager
 
 load_dotenv()
@@ -64,8 +55,11 @@ It is recommended to use slash commands and therefore not use prefix commands.
 
 If you want to use prefix commands, make sure to also enable the intent below in the Discord developer portal.
 """
-# intents.message_content = True
-
+intents.message_content = True
+intents.presences = True
+intents.members = True  # THIS is the key line
+intents.guilds = True
+intents.reactions = True
 # Setup both of the loggers
 
 
@@ -170,8 +164,7 @@ class DiscordBot(commands.Bot):
         """
         Setup the game status task of the bot.
         """
-        statuses = ["with you!", "with Krypton!", "with humans!"]
-        await self.change_presence(activity=discord.Game(random.choice(statuses)))
+        await self.change_presence(activity=discord.Game("keeping Ryuzen safe"))
 
     @status_task.before_loop
     async def before_status_task(self) -> None:
@@ -181,19 +174,21 @@ class DiscordBot(commands.Bot):
         await self.wait_until_ready()
 
     async def setup_hook(self) -> None:
-        """
-        This will just be executed when the bot starts the first time.
-        """
         self.logger.info(f"Logged in as {self.user.name}")
         self.logger.info(f"discord.py API version: {discord.__version__}")
         self.logger.info(f"Python version: {platform.python_version()}")
-        self.logger.info(
-            f"Running on: {platform.system()} {platform.release()} ({os.name})"
-        )
+        self.logger.info(f"Running on: {platform.system()} {platform.release()} ({os.name})")
         self.logger.info("-------------------")
+
         await self.init_db()
         await self.load_cogs()
         self.status_task.start()
+
+        # 🧠 sincronizza i comandi slash con Discord
+        synced = await self.tree.sync()
+        self.logger.info(f"✅ Slash commands sincronizzati: {len(synced)} comandi registrati.")
+
+        # connessione al DB
         self.database = DatabaseManager(
             connection=await aiosqlite.connect(
                 f"{os.path.realpath(os.path.dirname(__file__))}/database/database.db"
@@ -281,9 +276,31 @@ class DiscordBot(commands.Bot):
                 color=0xE02B2B,
             )
             await context.send(embed=embed)
+
+        elif isinstance(error, MissingPermission):
+            self.logger.warning(
+                f"{context.author} tried to use `{context.command}` but it’s not allowed."
+            )
+            await context.send(
+                embed=error_embed("Permission Denied", f"This command is not allowed for you."),
+                ephemeral=True
+            )
+            embed = discord.Embed(
+                title=":x: Permission Denied",
+                description="You need to be the bot owner or have a role like `RyuZen Team`.",
+                color=0xE02B2B
+            )
+            await context.send(embed=embed, ephemeral=True)
+
+        elif isinstance(error, WrongChannel):
+            self.logger.warning(
+                f"{context.author} tried to use `{context.command}` in #{context.channel.name} but it’s not allowed."
+            )
+            await context.send(
+                embed=error_embed("Wrong Channel", f"This command must be used in `#{os.getenv('ALLOWED_CHANNELS')}` channels."),
+                ephemeral=True)
         else:
             raise error
-
 
 bot = DiscordBot()
 bot.run(os.getenv("TOKEN"))

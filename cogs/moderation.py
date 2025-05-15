@@ -1,11 +1,3 @@
-"""
-Copyright © Krypton 2019-Present - https://github.com/kkrypt0nn (https://krypton.ninja)
-Description:
-🐍 A simple template to start to code your own and personalized Discord bot in Python
-
-Version: 6.3.0
-"""
-
 import os
 from datetime import datetime
 
@@ -106,6 +98,8 @@ class Moderation(commands.Cog, name="moderation"):
                 color=0xE02B2B,
             )
             await context.send(embed=embed)
+
+
 
     @commands.hybrid_command(
         name="ban",

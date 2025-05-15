@@ -1,11 +1,3 @@
-"""
-Copyright © Krypton 2019-Present - https://github.com/kkrypt0nn (https://krypton.ninja)
-Description:
-🐍 A simple template to start to code your own and personalized Discord bot in Python
-
-Version: 6.3.0
-"""
-
 import aiosqlite
 
 
@@ -94,3 +86,63 @@ class DatabaseManager:
             for row in result:
                 result_list.append(row)
             return result_list
+
+    async def set_code(self, server_id: int, code: str) -> None:
+        """
+        Inserisce o aggiorna il codice univoco per il server.
+        """
+        await self.connection.execute(
+            "INSERT INTO codes (server_id, code) VALUES (?, ?) ON CONFLICT(server_id) DO UPDATE SET code=excluded.code, created_at=CURRENT_TIMESTAMP",
+            (server_id, code)
+        )
+        await self.connection.commit()
+
+    async def get_code(self, server_id: int) -> str:
+        """
+        Recupera il codice per il server.
+        """
+        rows = await self.connection.execute(
+            "SELECT code FROM codes WHERE server_id=?",
+            (server_id,)
+        )
+        async with rows as cursor:
+            result = await cursor.fetchone()
+            return result[0] if result else None
+
+
+    async def delete_code(self, server_id: int) -> None:
+        """
+        Rimuove il codice per il server.
+        """
+        await self.connection.execute(
+            "DELETE FROM codes WHERE server_id=?",
+            (server_id,)
+        )
+        await self.connection.commit()
+
+    async def code_exists(self, server_id: int) -> bool:
+        """
+        Controlla se un codice è già salvato per il server.
+        """
+        code = await self.get_code(server_id)
+        return code is not None
+
+    async def get_last_reaction(self, user_id: int, guild_id: int) -> float | None:
+        rows = await self.connection.execute(
+            "SELECT strftime('%s', last_reacted_at) FROM reaction_cooldowns WHERE user_id=? AND guild_id=?",
+            (str(user_id), str(guild_id))
+        )
+        async with rows as cursor:
+            result = await cursor.fetchone()
+            return float(result[0]) if result else None
+
+    async def update_reaction_timestamp(self, user_id: int, guild_id: int) -> None:
+        await self.connection.execute(
+            """
+            INSERT INTO reaction_cooldowns (user_id, guild_id, last_reacted_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(user_id, guild_id) DO UPDATE SET last_reacted_at=CURRENT_TIMESTAMP
+            """,
+            (str(user_id), str(guild_id))
+        )
+        await self.connection.commit()
