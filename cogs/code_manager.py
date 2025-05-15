@@ -5,7 +5,7 @@ from utils.embeds import success_embed, error_embed, warning_embed, info_embed
 from utils.permissions import is_admin, is_allowed_channel, send_to_channel
 from views.request_code_view import RequestCodeView
 
-LOG_CHANNEL_NAME = "log"
+CODE_CHANNEL_ID = 1371542952257519626
 
 class CodeManager(commands.Cog, name="Code Manager"):
     def __init__(self, bot):
@@ -42,7 +42,7 @@ class CodeManager(commands.Cog, name="Code Manager"):
             bot=self.bot,
             embed=embed_request,
             view=view,
-            channel_id=1372333851640332418
+            channel_id=CODE_CHANNEL_ID
         )
 
     @is_admin()
