@@ -46,7 +46,7 @@ class RoleManager(commands.Cog, name="Role Manager"):
 
         if roles:
             role_names = ", ".join(role.name for role in roles)
-            self.logger.info(f"[RoleManager] ✅ {member.display_name} promoted to: {role_names}")
+            self.logger.info(f"[RoleManager] {member.display_name} promoted to: {role_names}")
             await ctx.send(embed=success_embed("User Promoted", f"{member.mention} promoted to: **{role_names}**."), ephemeral=True)
         else:
             self.logger.info(f"[RoleManager] ❌ No promotable roles for {member.display_name}")
@@ -65,7 +65,7 @@ class RoleManager(commands.Cog, name="Role Manager"):
 
         if roles:
             role_names = ", ".join(role.name for role in roles)
-            self.logger.info(f"[RoleManager] 🔻 {member.display_name} demoted to: {role_names}")
+            self.logger.info(f"[RoleManager] {member.display_name} demoted to: {role_names}")
             await ctx.send(embed=success_embed("User Demoted", f"{member.mention} demoted to: **{role_names}**."), ephemeral=True)
         else:
             self.logger.info(f"[RoleManager] ❌ No demotable roles for {member.display_name}")

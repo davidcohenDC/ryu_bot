@@ -283,9 +283,9 @@ class RoundAnnouncer(commands.Cog, name="Round Announcer"):
             ephemeral=False
         )
 
-    @commands.hybrid_command(name="post_winner_deck",
+    @commands.hybrid_command(name="tournament_winner_deck",
                              description="Invia l'immagine del mazzo vincente in #deck-winners.")
-    async def post_winner_deck(self, ctx: Context, player: str, no_check: bool = False):
+    async def tournament_winner_deck(self, ctx: Context, player: str, no_check: bool = False):
         if not has_permission(ctx):
             await ctx.send(embed=create_embed("🚫 Permission Denied",
                                               "Solo gli admin possono usare questo comando.",
@@ -374,8 +374,8 @@ class RoundAnnouncer(commands.Cog, name="Round Announcer"):
             ephemeral=False
         )
 
-    @commands.hybrid_command(name="declare_winner", description="Dichiara il vincitore del torneo.")
-    async def declare_winner(self, ctx: Context, winner: str, no_check: bool = False):
+    @commands.hybrid_command(name="tournament_winner", description="Dichiara il vincitore del torneo.")
+    async def tournament_winner(self, ctx: Context, winner: str, no_check: bool = False):
         if not has_permission(ctx):
             await ctx.send(
                 embed=create_embed("🚫 Permission Denied", "Solo gli admin possono dichiarare il vincitore.",
