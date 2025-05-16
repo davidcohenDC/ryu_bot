@@ -1,68 +1,29 @@
 import logging
 import os
+import pathlib
 import platform
+
 from config import settings
 import aiosqlite
 import discord
-
 from discord.ext import commands, tasks
 from discord.ext.commands import Context
 from dotenv import load_dotenv
 
+from data.manager import DatabaseManager
+from data.repositories.tournament_repository import TournamentRepository
+from models.tournament_model import TournamentInsertFailed
 from utils.embeds import error_embed
 from utils.permissions import MissingPermission, WrongChannel
-from database import DatabaseManager
 
 load_dotenv()
 
-"""	
-Setup bot intents (events restrictions)
-For more information about intents, please go to the following websites:
-https://discordpy.readthedocs.io/en/latest/intents.html
-https://discordpy.readthedocs.io/en/latest/intents.html#privileged-intents
-
-
-Default Intents:
-intents.bans = True
-intents.dm_messages = True
-intents.dm_reactions = True
-intents.dm_typing = True
-intents.emojis = True
-intents.emojis_and_stickers = True
-intents.guild_messages = True
-intents.guild_reactions = True
-intents.guild_scheduled_events = True
-intents.guild_typing = True
-intents.guilds = True
-intents.integrations = True
-intents.invites = True
-intents.messages = True # `message_content` is required to get the content of the messages
-intents.reactions = True
-intents.typing = True
-intents.voice_states = True
-intents.webhooks = True
-
-Privileged Intents (Needs to be enabled on developer portal of Discord), please use them only if you need them:
-intents.members = True
-intents.message_content = True
-intents.presences = True
-"""
-
 intents = discord.Intents.default()
-
-"""
-Uncomment this if you want to use prefix (normal) commands.
-It is recommended to use slash commands and therefore not use prefix commands.
-
-If you want to use prefix commands, make sure to also enable the intent below in the Discord developer portal.
-"""
 intents.message_content = True
 intents.presences = True
 intents.members = True  # THIS is the key line
 intents.guilds = True
 intents.reactions = True
-# Setup both of the loggers
-
 
 class LoggingFormatter(logging.Formatter):
     # Colors
@@ -112,6 +73,16 @@ file_handler.setFormatter(file_handler_formatter)
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 
+def format_error_field(message: str) -> str:
+    """
+    Estrae la prima parola da un messaggio e la formatta in backtick.
+    Es: "Missing required argument: tournament_name" → "`Missing` required argument: tournament_name"
+    """
+    words = message.strip().split()
+    if not words:
+        return ""
+    words[0] = f"`{words[0]}`".upper()
+    return " ".join(words)
 
 class DiscordBot(commands.Bot):
     def __init__(self) -> None:
@@ -136,31 +107,25 @@ class DiscordBot(commands.Bot):
 
 
     async def init_db(self) -> None:
-        async with aiosqlite.connect(
-            f"{os.path.realpath(os.path.dirname(__file__))}/database/database.db"
-        ) as db:
-            with open(
-                f"{os.path.realpath(os.path.dirname(__file__))}/database/schema.sql",
-                encoding = "utf-8"
-            ) as file:
+        async with aiosqlite.connect("data/database.db") as db:
+            with open("data/schema.sql", encoding="utf-8") as file:
                 await db.executescript(file.read())
             await db.commit()
 
     async def load_cogs(self) -> None:
-        """
-        The code in this function is executed whenever the bot will start.
-        """
-        for file in os.listdir(f"{os.path.realpath(os.path.dirname(__file__))}/cogs"):
-            if file.endswith(".py"):
-                extension = file[:-3]
-                try:
-                    await self.load_extension(f"cogs.{extension}")
-                    self.logger.info(f"Loaded extension '{extension}'")
-                except Exception as e:
-                    exception = f"{type(e).__name__}: {e}"
-                    self.logger.error(
-                        f"Failed to load extension {extension}\n{exception}"
-                    )
+        cogs_dir = pathlib.Path("cogs")
+        for path in cogs_dir.rglob("*.py"):
+            if path.name.startswith("_"):
+                continue  # skip __init__.py or private files
+
+            relative_path = path.with_suffix("")  # remove .py
+            module_path = ".".join(relative_path.parts)  # es: cogs.tournament.code_manager
+
+            try:
+                await self.load_extension(module_path)
+                self.logger.info(f"Loaded extension '{module_path}'")
+            except Exception as e:
+                self.logger.error(f"Failed to load extension {module_path}\n{type(e).__name__}: {e}")
 
     @tasks.loop(minutes=1.0)
     async def status_task(self) -> None:
@@ -185,9 +150,10 @@ class DiscordBot(commands.Bot):
         # connessione al DB
         self.database = DatabaseManager(
             connection=await aiosqlite.connect(
-                f"{os.path.realpath(os.path.dirname(__file__))}/database/database.db"
+                f"{os.path.realpath(os.path.dirname(__file__))}/data/database.db"
             )
         )
+
         await self.init_db()
         await self.load_cogs()
         self.status_task.start()
@@ -287,9 +253,11 @@ class DiscordBot(commands.Bot):
             await context.send(embed=embed)
 
         elif isinstance(error, commands.MissingRequiredArgument):
+            raw_msg = str(error)
+            formatted_msg = format_error_field(raw_msg)
             embed = error_embed(
                 title="W-w-wait!",
-                message=str(error).capitalize() + " I need that piece to finish the spell!"
+                message=formatted_msg + " I need that piece to finish the spell!"
             )
             await context.send(embed=embed)
 
@@ -312,7 +280,15 @@ class DiscordBot(commands.Bot):
                     title="Wrong Spot!",
                     message=f"You can't cast that here! Use this command in: {', '.join(f'<#{cid}>' for cid in settings.COMMAND_CHANNEL_IDS)}"
                 ))
-
+        elif isinstance(error, TournamentInsertFailed):
+            self.logger.warning(
+                f"{context.author} tried to use `{context.command}` but the tournament code was invalid."
+            )
+            await context.send(
+                embed=error_embed(
+                    title="Invalid Code",
+                    message="The tournament code you provided is invalid. Please check it and try again!"
+                ))
         else:
             await context.send(
                 embed=error_embed(

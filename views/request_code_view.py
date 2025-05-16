@@ -1,34 +1,42 @@
 import discord
+from discord import Interaction
+from discord.ui import Button, View
+
 from utils.embeds import create_embed, EMBED_COLOR_ERROR, EMBED_COLOR_INFO
+from services.tournament_service import TournamentService  # Usa il service anziché accedere direttamente al database
 
 
-class ClaimCodeButton(discord.ui.Button):
-    def __init__(self, database):
+class ClaimCodeButton(Button):
+    def __init__(self, service: TournamentService, tournament_id: int):
         super().__init__(
             label="🎟️ Claim Code",
             style=discord.ButtonStyle.success,
-            custom_id="get_code_button"  # sarà modificato dinamicamente in View
+            custom_id=f"get_code_button::{tournament_id}"
         )
-        self.database = database
+        self.service = service
+        self.tournament_id = tournament_id
 
-    async def callback(self, interaction: discord.Interaction):
+    async def callback(self, interaction: Interaction):
+        server_id = interaction.guild.id
+
         try:
-            _, tournament_id = interaction.data["custom_id"].split("::")
+            code = await self.service.get_code(server_id, self.tournament_id)
         except Exception:
             await interaction.response.send_message(
-                "❌ Unable to determine the tournament.",
+                embed=create_embed(
+                    "❌ Error",
+                    "An unexpected error occurred while retrieving the code.",
+                    EMBED_COLOR_ERROR
+                ),
                 ephemeral=True
             )
             return
-
-        server_id = interaction.guild.id
-        code = await self.database.get_code(server_id, tournament_id)
 
         if not code:
             await interaction.response.send_message(
                 embed=create_embed(
                     "❌ No Code Available",
-                    f"No code set for `{tournament_id}`.",
+                    f"No code set for tournament `{self.tournament_id}`.",
                     EMBED_COLOR_ERROR
                 ),
                 ephemeral=True
@@ -46,8 +54,8 @@ class ClaimCodeButton(discord.ui.Button):
 
         try:
             embed_dm = discord.Embed(
-                title=f"{tournament_id} – Exclusive Code",
-                description="You've successfully claimed the unique code. Keep it safe and private!",
+                title="🎟️ Exclusive Tournament Code",
+                description="You've successfully claimed the code. Keep it safe!",
                 color=EMBED_COLOR_INFO,
             )
             embed_dm.add_field(name="🔐 Code", value=f"`{code}`", inline=False)
@@ -55,19 +63,18 @@ class ClaimCodeButton(discord.ui.Button):
 
             await interaction.user.send(embed=embed_dm)
         except discord.Forbidden:
+            # User has DMs off — silently fail
             pass
 
 
-class RequestCodeView(discord.ui.View):
-    def __init__(self, database, tournament_id: str):
-        super().__init__(timeout=None)
-        btn = ClaimCodeButton(database)
-        btn.custom_id = f"get_code_button::{tournament_id}"
-        self.add_item(btn)
+class RequestCodeView(View):
+    def __init__(self, service: TournamentService, tournament_id: int, timeout: float | None = None):
+        super().__init__(timeout=timeout)
+        self.add_item(ClaimCodeButton(service, tournament_id))
 
     @classmethod
-    def create(cls, database, tournament_id: str, tournament_name: str) -> tuple[discord.Embed, "RequestCodeView"]:
-        view = cls(database, tournament_id)
+    def create(cls, service: TournamentService, tournament_id: int, tournament_name: str) -> tuple[discord.Embed, View]:
+        view = cls(service, tournament_id)
         embed = cls.get_announcement_embed(tournament_name)
         return embed, view
 
@@ -77,7 +84,7 @@ class RequestCodeView(discord.ui.View):
             discord.Embed(
                 title=f"{tournament_name} – Request Access Code",
                 description=(
-                    "Click the button below to receive **your unique access code** via DM and here.\n\n"
+                    "Click the button below to receive your unique code via DM and here.\n"
                     "> If DMs are disabled, you’ll still see the code here."
                 ),
                 color=EMBED_COLOR_INFO,
