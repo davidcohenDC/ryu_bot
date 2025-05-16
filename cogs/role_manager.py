@@ -1,76 +1,104 @@
+from __future__ import annotations
+
+from discord import Member
+
+from bot import DiscordBot
+
+"""RoleManager – promuove / retrocede membri (owner‑only).
+
+* I comandi sono disponibili **solo** all'owner del bot e solo nei canali
+  definiti in ``COMMAND_CHANNEL_IDS``.
+* La logica di permesso è centralizzata in ``cog_check``.
+* Utilizza le utility ``promote_member`` e ``demote_member`` da
+  :pymod:`utils.roles`.
+"""
+
+from typing import Final, Any, Coroutine
+
 import discord
 from discord.ext import commands
 from discord.ext.commands import Context
 
 from utils.roles import promote_member, demote_member
 from utils.embeds import success_embed, error_embed
-from utils.permissions import is_admin
+from utils.permissions import owner_only, command_channel_only
 
-async def resolve_member(guild: discord.Guild, user: discord.Member | discord.User, logger) -> discord.Member | None:
-    """
-    Garantisce che l'oggetto restituito sia un `discord.Member`, anche da `User` o ID.
-    """
+
+# ---------------------------------------------------------------------------
+# Helper
+# ---------------------------------------------------------------------------
+
+async def _resolve_member(guild: discord.Guild, user: discord.abc.User, logger) -> User | Member | None:
+    """Garantisce che l'oggetto restituito sia un ``discord.Member``."""
     if isinstance(user, discord.Member):
-        logger.debug(f"[RoleManager] Resolved member directly: {user.display_name}")
+        logger.debug("[RoleManager] Resolved member directly: %s", user.display_name)
         return user
 
-    member = guild.get_member(user.id)
+    member = guild.get_member(user.id) or await guild.fetch_member(user.id)
     if member:
-        logger.debug(f"[RoleManager] Member found in cache: {member.display_name}")
-        return member
+        logger.debug("[RoleManager] Member resolved: %s", member.display_name)
+    else:
+        logger.warning("[RoleManager] Member with ID %s not found.", user.id)
+    return member
 
-    try:
-        member = await guild.fetch_member(user.id)
-        logger.debug(f"[RoleManager] Member fetched via API: {member.display_name}")
-        return member
-    except discord.NotFound:
-        logger.warning(f"[RoleManager] Member with ID {user.id} not found.")
-        return None
 
+# ---------------------------------------------------------------------------
+# Cog
+# ---------------------------------------------------------------------------
 
 class RoleManager(commands.Cog, name="Role Manager"):
-    def __init__(self, bot):
+    """Comandi di promozione / retrocessione ruoli."""
+
+    CODE_EMOJI: Final = "⭐"  # esempio di costante declinabile
+
+    def __init__(self, bot: DiscordBot):
         self.bot = bot
         self.logger = bot.logger
 
-    @is_admin()
+    # ─────────────────────────────  GLOBAL GUARD  ──────────────────────────
+    async def cog_check(self, ctx: Context) -> bool:  # noqa: D401
+        return await owner_only().predicate(ctx) and await command_channel_only().predicate(ctx)  # type: ignore[attr-defined]
+
+    # ───────────────────────────────────────────────────────────────────────
+
     @commands.hybrid_command(name="promote", description="Promote a user to the next role(s) in hierarchy.")
     async def promote(self, ctx: Context, user: discord.Member | discord.User):
-        self.logger.debug(f"[RoleManager] Promotion requested for: {user}")
-        member = await resolve_member(ctx.guild, user, self.logger)
-        if not member:
+        member = await _resolve_member(ctx.guild, user, self.logger)
+        if member is None:
             await ctx.send(embed=error_embed("User Not Found", f"Could not find `{user}` in this server."), ephemeral=True)
             return
 
         roles = await promote_member(ctx.guild, member)
-
         if roles:
-            role_names = ", ".join(role.name for role in roles)
-            self.logger.info(f"[RoleManager] {member.display_name} promoted to: {role_names}")
-            await ctx.send(embed=success_embed("User Promoted", f"{member.mention} promoted to: **{role_names}**."), ephemeral=True)
+            names = ", ".join(r.name for r in roles)
+            await ctx.send(embed=success_embed("User Promoted", f"{member.mention} promoted to: **{names}**."), ephemeral=True)
+            self.logger.info("[RoleManager] %s promoted to %s", member.display_name, names)
         else:
-            self.logger.info(f"[RoleManager] ❌ No promotable roles for {member.display_name}")
             await ctx.send(embed=error_embed("Promotion Failed", f"{member.mention} has no promotable roles."), ephemeral=True)
+            self.logger.info("[RoleManager] No promotable roles for %s", member.display_name)
 
-    @is_admin()
+    # ───────────────────────────────────────────────────────────────────────
+
     @commands.hybrid_command(name="demote", description="Demote a user to the previous role(s) in hierarchy.")
     async def demote(self, ctx: Context, user: discord.Member | discord.User):
-        self.logger.debug(f"[RoleManager] Demotion requested for: {user}")
-        member = await resolve_member(ctx.guild, user, self.logger)
-        if not member:
+        member = await _resolve_member(ctx.guild, user, self.logger)
+        if member is None:
             await ctx.send(embed=error_embed("User Not Found", f"Could not find `{user}` in this server."), ephemeral=True)
             return
 
         roles = await demote_member(ctx.guild, member)
-
         if roles:
-            role_names = ", ".join(role.name for role in roles)
-            self.logger.info(f"[RoleManager] {member.display_name} demoted to: {role_names}")
-            await ctx.send(embed=success_embed("User Demoted", f"{member.mention} demoted to: **{role_names}**."), ephemeral=True)
+            names = ", ".join(r.name for r in roles)
+            await ctx.send(embed=success_embed("User Demoted", f"{member.mention} demoted to: **{names}**."), ephemeral=True)
+            self.logger.info("[RoleManager] %s demoted to %s", member.display_name, names)
         else:
-            self.logger.info(f"[RoleManager] ❌ No demotable roles for {member.display_name}")
             await ctx.send(embed=error_embed("Demotion Failed", f"{member.mention} has no demotable roles."), ephemeral=True)
+            self.logger.info("[RoleManager] No demotable roles for %s", member.display_name)
 
 
-async def setup(bot):
+# ---------------------------------------------------------------------------
+# Extension entrypoint
+# ---------------------------------------------------------------------------
+
+async def setup(bot: DiscordBot):
     await bot.add_cog(RoleManager(bot))

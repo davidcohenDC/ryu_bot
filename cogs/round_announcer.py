@@ -219,7 +219,7 @@ class RoundControlView(discord.ui.View):
 
         announce_channel = interaction.guild.get_channel(ANNOUNCE_CHANNEL_ID)
         if not announce_channel:
-            await interaction.response.send_message(f"❌ Canale `#{ANNOUNCE_CHANNEL_NAME}` non trovato.", ephemeral=True)
+            await interaction.response.send_message(f"❌ Canale `#{announce_channel}` non trovato.", ephemeral=True)
             return
 
         await announce_channel.send(message, allowed_mentions=discord.AllowedMentions(roles=True))
@@ -411,7 +411,7 @@ class RoundAnnouncer(commands.Cog, name="Round Announcer"):
 
         announce_channel = ctx.guild.get_channel(ANNOUNCE_CHANNEL_ID)
         if not announce_channel:
-            await ctx.send(embed=create_embed("❌ Channel Not Found", f"Canale `#{ANNOUNCE_CHANNEL_NAME}` non trovato.",
+            await ctx.send(embed=create_embed("❌ Channel Not Found", f"Canale `#{announce_channel}` non trovato.",
                                               EMBED_COLOR_ERROR), ephemeral=True)
             return
 
@@ -481,13 +481,13 @@ class RoundAnnouncer(commands.Cog, name="Round Announcer"):
         announce_channel = ctx.guild.get_channel(ANNOUNCE_CHANNEL_ID)
         if not announce_channel:
             await ctx.send(
-                embed=create_embed("❌ Channel Not Found", f"Please create a channel named `#{ANNOUNCE_CHANNEL_NAME}`.", EMBED_COLOR_ERROR),
+                embed=create_embed("❌ Channel Not Found", f"Please create a channel named `#{announce_channel}`.", EMBED_COLOR_ERROR),
                 ephemeral=True
             )
             return
 
         await announce_channel.send(message, allowed_mentions=discord.AllowedMentions(roles=True))
-        await ctx.send(embed=create_embed("✅ Round Announced", f"Message sent to `#{ANNOUNCE_CHANNEL_NAME}`.", EMBED_COLOR_SUCCESS), ephemeral=True)
+        await ctx.send(embed=create_embed("✅ Round Announced", f"Message sent to `#{announce_channel}`.", EMBED_COLOR_SUCCESS), ephemeral=True)
 
     @commands.hybrid_command(name="set_round", description="Manually set the current round index.")
     async def set_round(self, ctx: Context, index: int = None):

@@ -1,19 +1,41 @@
-import json
-import os
-
 from discord.ext import commands
+from config import settings
 
-# === ENV PARSING ===
+def staff_only() -> commands.check:
+    """Decoratore – consente l'uso solo ai ruoli in ``STAFF_ROLE_IDS``."""
 
-def get_allowed_channels() -> list[int | str]:
-    raw = json.loads(os.getenv("ALLOWED_CHANNELS", "[]"))
-    return [int(x) if str(x).isdigit() else x for x in raw]
+    async def predicate(ctx: Context) -> bool:  # noqa: D401
+        if ctx.author.id == ctx.bot.owner_id:
+            return True
+        for role in ctx.author.roles:
+            if role.id in settings.STAFF_ROLE_IDS:
+                return True
+        raise MissingPermission()
 
-def get_allowed_roles() -> list[int | str]:
-    raw = json.loads(os.getenv("ALLOWED_ROLES", "[]"))
-    return [int(x) if str(x).isdigit() else x for x in raw]
+    return commands.check(predicate)
 
-# === CUSTOM EXCEPTIONS ===
+
+def owner_only() -> commands.check:
+    """Permette l’uso solo al proprietario dell’applicazione."""
+
+    async def predicate(ctx: Context) -> bool:
+        # is_owner() fa cache dopo la prima chiamata
+        if await ctx.bot.is_owner(ctx.author):
+            return True
+        raise MissingPermission("You are not the bot owner.")
+
+    return commands.check(predicate)
+
+
+def command_channel_only() -> commands.check:
+    """Decoratore – permette il comando solo nei canali di ``COMMAND_CHANNEL_IDS``."""
+
+    async def predicate(ctx: Context) -> bool:  # noqa: D401
+        if ctx.channel.id in settings.COMMAND_CHANNEL_IDS:
+            return True
+        raise WrongChannel()
+
+    return commands.check(predicate)
 
 class MissingPermission(commands.CheckFailure):
     def __init__(self, message="You don't have permission to use this command."):
@@ -64,56 +86,6 @@ async def safe_send(
     else:
         # Classic prefixed command fallback (ephemeral not supported)
         await ctx.send(**kwargs)
-
-
-# === CHECKS ===
-
-def is_admin():
-    async def predicate(ctx: Context):
-        allowed_roles = get_allowed_roles()
-
-        if ctx.author.id == ctx.bot.owner_id:
-            return True
-
-        for role in ctx.author.roles:
-            if role.name in allowed_roles or role.id in allowed_roles:
-                return True
-
-        raise MissingPermission()
-    return commands.check(predicate)
-
-
-def is_member():
-    async def predicate(ctx: Context):
-        if not ctx.guild:
-            raise NotAMember("This command must be used inside a server.")
-
-        member = ctx.guild.get_member(ctx.author.id)
-        if member:
-            return True
-
-        try:
-            member = await ctx.guild.fetch_member(ctx.author.id)
-            if member:
-                return True
-        except discord.NotFound:
-            pass
-
-        raise NotAMember("You are not a member of this server.")
-    return commands.check(predicate)
-
-
-def is_allowed_channel():
-    async def predicate(ctx: Context):
-        allowed_channels = get_allowed_channels()
-
-        if ctx.channel.name in allowed_channels or ctx.channel.id in allowed_channels:
-            return True
-
-        raise WrongChannel()
-    return commands.check(predicate)
-
-# === CHANNEL SEND WRAPPER ===
 
 async def send_to_channel(
     ctx: Context,

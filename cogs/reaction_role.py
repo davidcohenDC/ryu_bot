@@ -1,82 +1,113 @@
-import os
+from __future__ import annotations
+
 import emoji
 import discord
 from discord.ext import commands
-
+from bot import DiscordBot
+from config import settings
 from utils.roles import promote_member, demote_member
 
-# === CONFIGURATION ===
-TARGET_MESSAGE_ID = int(os.getenv("TARGET_MESSAGE_ID", "1371600446531305605"))
-TARGET_EMOJI_NAMES = [":heart:", ":hearts:"]
 
+# ────────────────────────── costanti di configurazione
+TARGET_MESSAGE_ID: int                 = settings.RR_MESSAGE_ID          # ex TARGET_MESSAGE_ID
+TARGET_EMOJI_NAMES: list[str]          = settings.RR_EMOJI_NAMES         # ex TARGET_EMOJI_NAMES
+VERBOSE: bool                          = settings.DEBUG_REACTIONS        # log extra facoltativo
+
+TARGET_EMOJI_CHARS = {emoji.emojize(e, language="alias") for e in TARGET_EMOJI_NAMES}
+
+
+# ────────────────────────── helper “puri” (facili da testare)
 def is_target_reaction(payload: discord.RawReactionActionEvent) -> bool:
-    emoji_chars = [emoji.emojize(e, language="alias") for e in TARGET_EMOJI_NAMES]
-    return payload.message_id == TARGET_MESSAGE_ID and payload.emoji.name in emoji_chars
+    """True se la reaction corrisponde al messaggio/emoji configurati."""
+    return (
+        payload.message_id == TARGET_MESSAGE_ID
+        and payload.emoji.name in TARGET_EMOJI_CHARS
+    )
 
-async def get_member(guild: discord.Guild, user_id: int, logger) -> discord.Member | None:
-    member = guild.get_member(user_id)
-    if member:
-        return member
-    try:
-        member = await guild.fetch_member(user_id)
-        logger.debug(f"[ReactionRole] Member fetched via API: {member.display_name}")
-        return member
-    except discord.NotFound:
-        logger.warning(f"[ReactionRole] Member with ID {user_id} not found.")
-        return None
 
-async def send_temp_reply(channel, message_id, member, text: str, logger):
-    try:
-        message = await channel.fetch_message(message_id)
-        await message.reply(
-            content=f"{member.mention} {text}",
-            delete_after=10,
-            mention_author=False
-        )
-    except Exception as e:
-        logger.error(f"[ReactionRole] ❗ Could not send confirmation: {e}")
+async def fetch_member(guild: discord.Guild, user_id: int) -> discord.Member | None:
+    """Garantisce un `discord.Member` da cache o API; None se non trovato."""
+    return guild.get_member(user_id) or await guild.fetch_member(user_id)
 
-class ReactionRole(commands.Cog):
-    def __init__(self, bot):
+
+async def temp_reply(
+    message: discord.Message,
+    member: discord.Member,
+    text: str,
+    *,
+    timeout: int = 10,
+) -> None:
+    """Risponde al messaggio e autodelete dopo `timeout` secondi."""
+    await message.reply(
+        f"{member.mention} {text}",
+        delete_after=timeout,
+        mention_author=False,
+    )
+
+
+# ────────────────────────── Cog principale
+class ReactionRole(commands.Cog, name="Reaction Role"):
+    """Aggiunge/Revoca ruoli quando l’utente mette/toglie la reaction giusta."""
+
+    def __init__(self, bot: DiscordBot):
         self.bot = bot
-        self.logger = bot.logger
+        self.log = bot.logger
 
-    async def handle_roles(self, payload: discord.RawReactionActionEvent, promote: bool):
+    # ---------- core ----------
+    async def _handle(self, payload: discord.RawReactionActionEvent, *, promote: bool):
         if not is_target_reaction(payload):
             return
 
         guild = self.bot.get_guild(payload.guild_id)
-        if not guild:
+        if not guild:  # guild could be None if bot left meanwhile
             return
 
-        member = await get_member(guild, payload.user_id, self.logger)
+        member = await fetch_member(guild, payload.user_id)
         if not member or member.bot:
             return
 
-        roles = await promote_member(guild, member) if promote else await demote_member(guild, member)
-
+        roles = (
+            await promote_member(guild, member)
+            if promote
+            else await demote_member(guild, member)
+        )
         if not roles:
-            self.logger.info(f"[ReactionRole] No roles to {'promote' if promote else 'revoke'} for {member.display_name}")
+            if VERBOSE:
+                self.log.info(
+                    "[ReactionRole] No roles to %s for %s",
+                    "promote" if promote else "demote",
+                    member.display_name,
+                )
             return
 
-        changed_names = ", ".join(role.name for role in roles)
+        names = ", ".join(r.name for r in roles)
         action = "promoted" if promote else "demoted"
-        self.logger.info(f"[ReactionRole] {member.display_name} {action} → {changed_names}")
+        self.log.info("[ReactionRole] %s %s → %s", member.display_name, action, names)
 
+        # feedback rapido nell’UI
         channel = guild.get_channel(payload.channel_id)
         if channel:
-            verb = "verified" if promote else "revoked"
-            await send_temp_reply(channel, payload.message_id, member, f"your verification was {verb}: `{changed_names}`", self.logger)
+            try:
+                msg = await channel.fetch_message(payload.message_id)
+                verb = "verified" if promote else "revoked"
+                await temp_reply(msg, member, f"your verification was **{verb}**: `{names}`")
+            except (discord.Forbidden, discord.NotFound):
+                pass  # niente panico se il bot non può leggere quel messaggio
 
-    @commands.Cog.listener()
-    async def on_raw_reaction_add(self, payload: discord.RawReactionActionEvent):
-        self.logger.debug(f"[ReactionRole] ✅ Reaction added by user ID {payload.user_id}")
-        await self.handle_roles(payload, promote=True)
+    # ---------- listeners ----------
+    @commands.Cog.listener("on_raw_reaction_add")
+    async def _on_add(self, p: discord.RawReactionActionEvent):
+        if VERBOSE:
+            self.log.debug("[ReactionRole] reaction add by %s", p.user_id)
+        await self._handle(p, promote=True)
 
-    @commands.Cog.listener()
-    async def on_raw_reaction_remove(self, payload: discord.RawReactionActionEvent):
-        self.logger.debug(f"[ReactionRole] ❌ Reaction removed by user ID {payload.user_id}")
-        await self.handle_roles(payload, promote=False)
+    @commands.Cog.listener("on_raw_reaction_remove")
+    async def _on_remove(self, p: discord.RawReactionActionEvent):
+        if VERBOSE:
+            self.log.debug("[ReactionRole] reaction remove by %s", p.user_id)
+        await self._handle(p, promote=False)
 
-async def setup(bot):
+
+# ────────────────────────── setup entry-point
+async def setup(bot: DiscordBot):
     await bot.add_cog(ReactionRole(bot))

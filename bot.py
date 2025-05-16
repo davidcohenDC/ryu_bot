@@ -1,9 +1,10 @@
 import logging
 import os
 import platform
-
+from config import settings
 import aiosqlite
 import discord
+
 from discord.ext import commands, tasks
 from discord.ext.commands import Context
 from dotenv import load_dotenv
@@ -115,7 +116,7 @@ logger.addHandler(file_handler)
 class DiscordBot(commands.Bot):
     def __init__(self) -> None:
         super().__init__(
-            command_prefix=commands.when_mentioned_or(os.getenv("PREFIX")),
+            command_prefix=commands.when_mentioned_or(settings.PREFIX),
             intents=intents,
             help_command=None,
         )
@@ -129,8 +130,10 @@ class DiscordBot(commands.Bot):
         """
         self.logger = logger
         self.database = None
-        self.bot_prefix = os.getenv("PREFIX")
-        self.invite_link = os.getenv("INVITE_LINK")
+        self.settings = settings
+        self.bot_prefix = self.settings.PREFIX
+        self.invite_link = self.settings.INVITE_LINK
+
 
     async def init_db(self) -> None:
         async with aiosqlite.connect(
@@ -179,21 +182,22 @@ class DiscordBot(commands.Bot):
         self.logger.info(f"Python version: {platform.python_version()}")
         self.logger.info(f"Running on: {platform.system()} {platform.release()} ({os.name})")
         self.logger.info("-------------------")
-
-        await self.init_db()
-        await self.load_cogs()
-        self.status_task.start()
-
-        # 🧠 sincronizza i comandi slash con Discord
-        synced = await self.tree.sync()
-        self.logger.info(f"✅ Slash commands sincronizzati: {len(synced)} comandi registrati.")
-
         # connessione al DB
         self.database = DatabaseManager(
             connection=await aiosqlite.connect(
                 f"{os.path.realpath(os.path.dirname(__file__))}/database/database.db"
             )
         )
+        await self.init_db()
+        await self.load_cogs()
+        self.status_task.start()
+        self.logger.info("Bot commands: %s",
+                         [cmd.name for cmd in self.commands])
+
+        synced = await self.tree.sync()
+        self.logger.info(f"✅ Slash commands sincronizzati: {len(synced)} comandi registrati.")
+
+
 
     async def on_message(self, message: discord.Message) -> None:
         """
@@ -225,23 +229,34 @@ class DiscordBot(commands.Bot):
 
     async def on_command_error(self, context: Context, error) -> None:
         """
-        The code in this event is executed every time a normal valid command catches an error.
+        This event is triggered whenever a valid command runs into an error.
 
-        :param context: The context of the normal command that failed executing.
-        :param error: The error that has been faced.
+        :param context: The context of the command that failed.
+        :param error: The error that occurred.
         """
         if isinstance(error, commands.CommandOnCooldown):
             minutes, seconds = divmod(error.retry_after, 60)
             hours, minutes = divmod(minutes, 60)
             hours = hours % 24
-            embed = discord.Embed(
-                description=f"**Please slow down** - You can use this command again in {f'{round(hours)} hours' if round(hours) > 0 else ''} {f'{round(minutes)} minutes' if round(minutes) > 0 else ''} {f'{round(seconds)} seconds' if round(seconds) > 0 else ''}.",
-                color=0xE02B2B,
+            time_parts = []
+            if round(hours) > 0:
+                time_parts.append(f"{round(hours)} hours")
+            if round(minutes) > 0:
+                time_parts.append(f"{round(minutes)} minutes")
+            if round(seconds) > 0:
+                time_parts.append(f"{round(seconds)} seconds")
+
+            embed = error_embed(
+                title="*Sniff sniff!*",
+                message="You're going too fast! Let me rest my wings... Try again in "
+                        + " ".join(time_parts) + "."
             )
             await context.send(embed=embed)
+
         elif isinstance(error, commands.NotOwner):
-            embed = discord.Embed(
-                description="You are not the owner of the bot!", color=0xE02B2B
+            embed = error_embed(
+                title="Gasp!",
+                message="Only my master can use this command! And you... you’re not them!"
             )
             await context.send(embed=embed)
             if context.guild:
@@ -252,28 +267,29 @@ class DiscordBot(commands.Bot):
                 self.logger.warning(
                     f"{context.author} (ID: {context.author.id}) tried to execute an owner only command in the bot's DMs, but the user is not an owner of the bot."
                 )
+
         elif isinstance(error, commands.MissingPermissions):
-            embed = discord.Embed(
-                description="You are missing the permission(s) `"
-                + ", ".join(error.missing_permissions)
-                + "` to execute this command!",
-                color=0xE02B2B,
+            embed = error_embed(
+                title="Uh-oh!",
+                message="You need the following shiny permissions to do that: `"
+                            + ", ".join(error.missing_permissions)
+                            + "`! Without them, my magic won’t work!"
             )
             await context.send(embed=embed)
+
         elif isinstance(error, commands.BotMissingPermissions):
-            embed = discord.Embed(
-                description="I am missing the permission(s) `"
-                + ", ".join(error.missing_permissions)
-                + "` to fully perform this command!",
-                color=0xE02B2B,
+            embed = error_embed(
+                title="Oopsie!",
+                message="Oopsie! I can't complete that because I'm missing: `"
+                            + ", ".join(error.missing_permissions)
+                            + "`! Can you help me get those?"
             )
             await context.send(embed=embed)
+
         elif isinstance(error, commands.MissingRequiredArgument):
-            embed = discord.Embed(
-                title="Error!",
-                # We need to capitalize because the command arguments have no capital letter in the code and they are the first word in the error message.
-                description=str(error).capitalize(),
-                color=0xE02B2B,
+            embed = error_embed(
+                title="W-w-wait!",
+                message=str(error).capitalize() + " I need that piece to finish the spell!"
             )
             await context.send(embed=embed)
 
@@ -282,25 +298,29 @@ class DiscordBot(commands.Bot):
                 f"{context.author} tried to use `{context.command}` but it’s not allowed."
             )
             await context.send(
-                embed=error_embed("Permission Denied", f"This command is not allowed for you."),
-                ephemeral=True
-            )
-            embed = discord.Embed(
-                title=":x: Permission Denied",
-                description="You need to be the bot owner or have a role like `RyuZen Team`.",
-                color=0xE02B2B
-            )
-            await context.send(embed=embed, ephemeral=True)
+                embed=error_embed(
+                    title="Nuh-uh!",
+                    message=f"Only the mighty **{settings.OWNER_ROLE}** role can use this command. That’s the rule!"
+                ))
 
         elif isinstance(error, WrongChannel):
             self.logger.warning(
                 f"{context.author} tried to use `{context.command}` in #{context.channel.name} but it’s not allowed."
             )
             await context.send(
-                embed=error_embed("Wrong Channel", f"This command must be used in `#{os.getenv('ALLOWED_CHANNELS')}` channels."),
-                ephemeral=True)
-        else:
-            raise error
+                embed=error_embed(
+                    title="Wrong Spot!",
+                    message=f"You can't cast that here! Use this command in: {', '.join(f'<#{cid}>' for cid in settings.COMMAND_CHANNEL_IDS)}"
+                ))
 
-bot = DiscordBot()
-bot.run(os.getenv("TOKEN"))
+        else:
+            await context.send(
+                embed=error_embed(
+                    title="Huh?",
+                    message=f"Command `{context.command}`? Never heard of it! Maybe it’s hiding in a cave..."
+                )
+            )
+
+if __name__ == "__main__":
+    bot = DiscordBot()
+    bot.run(settings.TOKEN)
