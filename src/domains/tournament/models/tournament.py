@@ -1,8 +1,8 @@
-from dataclasses import dataclass
-from datetime import datetime
+from __future__ import annotations
+from dataclasses import dataclass, replace, field
+from datetime import datetime, timezone
 from typing import Optional
 
-"""Tournament model representing a tournament in the system."""
 @dataclass(slots=True, frozen=True)
 class Tournament:
     server_id: int
@@ -12,7 +12,8 @@ class Tournament:
     top_cut: int = 0
     current_round: int = 0
     is_deleted: bool = False
-    created_at: Optional[datetime] = None
+    created_at: datetime = field(
+        default_factory=lambda: datetime.now(tz=timezone.utc)
+    )
     updated_at: Optional[datetime] = None
     id: Optional[int] = None
-

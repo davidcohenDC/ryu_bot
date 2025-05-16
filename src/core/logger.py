@@ -22,11 +22,11 @@ class LoggingFormatter(logging.Formatter):
 
     def format(self, record):
         log_color = self.COLORS[record.levelno]
-        format = "(black){asctime}(reset) (levelcolor){levelname:<8}(reset) (green){name}(reset) {message}"
-        format = format.replace("(black)", self.black + self.bold)
-        format = format.replace("(reset)", self.reset)
-        format = format.replace("(levelcolor)", log_color)
-        format = format.replace("(green)", self.green + self.bold)
-        formatter = logging.Formatter(format, "%Y-%m-%d %H:%M:%S", style="{")
+        _format = "(black){asctime}(reset) (levelcolor){levelname:<8}(reset) (green){name}(reset) {message}"
+        _format = _format.replace("(black)", self.black + self.bold)
+        _format = _format.replace("(reset)", self.reset)
+        _format = _format.replace("(levelcolor)", log_color)
+        _format = _format.replace("(green)", self.green + self.bold)
+        formatter = logging.Formatter(_format, "%Y-%m-%d %H:%M:%S", style="{")
         return formatter.format(record)
 
