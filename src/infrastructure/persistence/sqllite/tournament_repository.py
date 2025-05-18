@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List
 
 import aiosqlite
 
-from src.domains.tournament.exceptions import TournamentInsertFailed, TournamentNotFound
-from src.domains.tournament.models.tournament import Tournament
-from src.domains.tournament.repositories.tournament_repo import TournamentRepository
+from src.domains.tournament.repositories.exceptions import TournamentInsertFailed, TournamentNotFound
+from src.domains.models import Tournament
+from src.domains.tournament.repositories.repository import TournamentRepository
 
 class SQLiteTournamentRepository(TournamentRepository):
     """Implementazione asincrona su database SQLite."""

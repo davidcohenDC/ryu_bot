@@ -1,5 +1,5 @@
 from discord.ext import commands
-from src.domains.tournament.models.tournament import Tournament
+from src.domains.models import Tournament
 
 
 class TournamentConverter(commands.Converter):

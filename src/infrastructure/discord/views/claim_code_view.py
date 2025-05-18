@@ -2,7 +2,7 @@ import discord
 from discord import Interaction
 from discord.ui import Button, View
 
-from src.application.tournament.tournament_service import TournamentService
+from src.application.tournament.tournament_service_old import TournamentService
 from src.utils.embeds import create_embed, EMBED_COLOR_ERROR, EMBED_COLOR_INFO
 
 
