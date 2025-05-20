@@ -28,7 +28,7 @@ class TournamentDTO(BaseDTO[Tournament]):
 
     # ---- Runtime validation (for untrusted inputs) ----
     @classmethod
-    @field_validator("field_name")
+    @field_validator("phases")
     def validate_phases_not_empty(cls, value: List[PhaseDTO]) -> List[PhaseDTO]:
         """Validate that the phases list is not empty."""
         if not value:

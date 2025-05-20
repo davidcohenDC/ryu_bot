@@ -26,7 +26,6 @@ class DeleteTournamentUseCase(BaseUseCase[DeleteTournamentCommand, TournamentId]
     @wrap_use_cases_exceptions
     async def execute(self, cmd: DeleteTournamentCommand) -> TournamentId:
         tour_id = TournamentId(cmd.id)
-        print("DeleteTournamentUseCase.execute(): tour_id=", tour_id)
 
         async with self._uow as uow:
             tour_id: TournamentId = await uow.tournaments.delete(tour_id)

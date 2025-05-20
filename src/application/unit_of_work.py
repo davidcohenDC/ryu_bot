@@ -12,11 +12,6 @@ class UnitOfWork(ABC):
     def tournaments(self) -> TournamentRepository:
         ...
 
-    # @property
-    # @abstractmethod
-    # def users(self) -> UserRepository:
-    #     ...
-
     @abstractmethod
     async def __aenter__(self) -> "UnitOfWork":
         ...

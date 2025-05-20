@@ -8,3 +8,4 @@ pymongo~=4.11
 sqlalchemy~=2.0.41
 sqlmodel~=0.0.24
 nanoid~=2.0.0
+pytest~=8.3.5

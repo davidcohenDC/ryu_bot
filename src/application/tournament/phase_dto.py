@@ -28,7 +28,6 @@ class PhaseDTO(BaseDTO[Phase]):
         return v
 
     def to_domain(self) -> Phase:
-        # Ora passiamo anche phase_order
         return Phase.create(
             phase_order=self.phase_order,
             type=self.type,

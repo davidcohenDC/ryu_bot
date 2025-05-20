@@ -57,14 +57,16 @@ class Tournament:
         if not between(
                 value=tour.active_phase_index,
                 lower=0,
-                upper=len(tour.phases)
+                upper=len(tour.phases),
+                inclusive=True
         ):
             raise ValueError("Invalid active phase index")
 
         if not between(
                 value=tour.active_round_index,
                 lower=0,
-                upper=tour.active_phase.rounds
+                upper=tour.active_phase.rounds,
+                inclusive=True
         ):
             raise ValueError("Invalid active round index for current phase")
 

@@ -8,7 +8,7 @@ from src.domains.tournament.value_objects.ids import TournamentId
 from src.domains.tournament.value_objects.phase import Phase
 
 def make_nanoid() -> str:
-    # 10 alphanumeric characters
+    """ Generate a unique ID using nanoid."""
     return generate("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz", 10)
 
 class ApplicationContextORM(SQLModel, table=True):

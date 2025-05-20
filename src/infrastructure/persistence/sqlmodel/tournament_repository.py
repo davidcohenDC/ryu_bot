@@ -47,7 +47,7 @@ class SQLModelTournamentRepository(TournamentRepository):
         """
         Soft‐delete o hard‐delete. Qui chiamiamo direttamente commit().
         """
-        print("SQLModelTournamentRepository.delete(): tournament_id=", tournament_id)
+
         stmt = select(TournamentORM).where(TournamentORM.id == tournament_id)
         result = await self.session.exec(stmt)
         tour = result.one()
