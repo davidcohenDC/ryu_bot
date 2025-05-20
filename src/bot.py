@@ -8,7 +8,7 @@ from discord.ext import commands
 from discord.ext.commands import Context
 from dotenv import load_dotenv
 from config import settings
-from core.logger import LoggingFormatter
+from src.config.logger import LoggingFormatter
 from src.infrastructure.discord.permissions import WrongChannel, MissingPermission
 from src.utils.embeds import error_embed
 

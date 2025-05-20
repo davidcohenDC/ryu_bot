@@ -3,14 +3,14 @@ from typing import Optional
 from discord.ext import commands
 from discord.ext.commands import Context, CommandError
 from discord import app_commands
-from src.application.tournament.tournament_service import TournamentService
+from src.application.tournament.tournament_service_old import TournamentService
 from src.config.config import settings
 from src.bot import DiscordBot
 from src.infrastructure.discord.permissions import staff_only, command_channel_only, send_to_channel
-from src.domains.tournament.exceptions import TournamentNotFound, TournamentInsertFailed
-from src.domains.tournament.models.tournament import Tournament
+from src.domains.tournament.repositories.exceptions import TournamentNotFound, TournamentInsertFailed
+from src.domains.models import Tournament
 from src.infrastructure.discord.views.claim_code_view import RequestCodeView
-from src.infrastructure.persistence.sqllite.tournament_repository import SQLiteTournamentRepository
+from src.infrastructure.persistence.sqllite.tournament_repository_old import SQLiteTournamentRepositoryOld
 from src.utils.embeds import success_embed, info_embed, error_embed
 
 
@@ -206,6 +206,6 @@ class TournamentCog(commands.Cog):
 
 
 async def setup(bot: DiscordBot):
-    repo = SQLiteTournamentRepository(bot.connection)
+    repo = SQLiteTournamentRepositoryOld(bot.connection)
     service = TournamentService(repo)
     await bot.add_cog(TournamentCog(bot, service))
