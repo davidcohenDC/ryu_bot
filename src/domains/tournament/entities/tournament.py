@@ -1,24 +1,24 @@
 from __future__ import annotations
 from dataclasses import dataclass, replace
-from typing import Optional, Tuple
+from typing import Tuple, List, Optional
 
-from src.domains.models.application_context import ApplicationContext
-from src.domains.models.enums import GameFormat
-from src.domains.models.ids import TournamentId
-from src.domains.models.phase import Phase
+from src.domains.tournament.value_objects.enums import GameFormat
+from src.domains.tournament.value_objects.ids import TournamentId
+from src.domains.tournament.value_objects.phase import Phase
 from src.shared.utils import between
 
-# ------- domain model aggregate --------
 @dataclass(slots=True, frozen=True)
 class Tournament:
-    id: Optional[TournamentId]
+    """
+    Tournament entity representing a competitive event with multiple phases and rounds.
+    """
+    id: TournamentId
     name: str
-    code: Optional[str]
     game_format: GameFormat
+    entry_code: Optional[str]
     phases: Tuple[Phase, ...]
-    context: Optional[ApplicationContext] = None
-    active_phase_index: int = 0 # Index (0-based) of the current phase
-    active_round_index: int = 0 # Index (0-based) of the current round within the active phase
+    active_phase_index: int = 0
+    active_round_index: int = 0
 
     def __post_init__(self):
         self._validate_format(self)
@@ -27,24 +27,23 @@ class Tournament:
     @classmethod
     def create(
         cls,
+        id: TournamentId,
         name: str,
-        code: Optional[str],
         game_format: GameFormat,
+        entry_code: Optional[str],
         phases: Tuple[Phase, ...],
-        context: Optional[ApplicationContext] = None,
+        active_phase_index: int = 0,
+        active_round_index: int = 0,
     ) -> Tournament:
-        """Factory method to safely construct a Tournament aggregate."""
         return cls(
-            id=None,
+            id=id,
             name=name,
-            code=code,
             game_format=game_format,
+            entry_code=entry_code,
             phases=phases,
-            context=context,
-            active_phase_index=0,
-            active_round_index=0,
+            active_phase_index=active_phase_index,
+            active_round_index=active_round_index,
         )
-
     # ------- validation --------
 
     @staticmethod
@@ -98,3 +97,40 @@ class Tournament:
                            active_round_index=0)
 
         return self
+
+    def reset(self) -> Tournament:
+        """
+        Reset the tournament to the first phase and round.
+        """
+        return replace(self, active_phase_index=0, active_round_index=0)
+
+    def reorder_phase(self, from_idx: int, to_idx: int) -> Tournament:
+        """
+        Reorder phases in the tournament.
+        Raises IndexError if indices are out of range.
+        """
+        if not between(
+                value=from_idx,
+                lower=0,
+                upper=len(self.phases)
+        ) or not between(
+                value=to_idx,
+                lower=0,
+                upper=len(self.phases)
+        ):
+            raise IndexError("Phase index out of range")
+
+
+        # Create a new list of phases to avoid mutating the original tuple
+        phases_list: List[Phase] = list(self.phases)
+        phase: Phase = phases_list.pop(from_idx)
+        phases_list.insert(to_idx, phase)
+
+        # 2) Calculate the new phase numbers
+        new_phases = tuple(
+            p.set_phase_order(idx + 1)
+            for idx, p in enumerate(phases_list)
+        )
+
+        # 3) Return a new Tournament instance with the updated phases
+        return replace(self, phases=new_phases)

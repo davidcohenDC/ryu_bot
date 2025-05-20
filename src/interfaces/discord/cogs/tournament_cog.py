@@ -10,7 +10,7 @@ from src.infrastructure.discord.permissions import staff_only, command_channel_o
 from src.domains.tournament.repositories.exceptions import TournamentNotFound, TournamentInsertFailed
 from src.domains.models import Tournament
 from src.infrastructure.discord.views.claim_code_view import RequestCodeView
-from src.infrastructure.persistence.sqllite.tournament_repository import SQLiteTournamentRepository
+from src.infrastructure.persistence.sqllite.tournament_repository_old import SQLiteTournamentRepositoryOld
 from src.utils.embeds import success_embed, info_embed, error_embed
 
 
@@ -206,6 +206,6 @@ class TournamentCog(commands.Cog):
 
 
 async def setup(bot: DiscordBot):
-    repo = SQLiteTournamentRepository(bot.connection)
+    repo = SQLiteTournamentRepositoryOld(bot.connection)
     service = TournamentService(repo)
     await bot.add_cog(TournamentCog(bot, service))

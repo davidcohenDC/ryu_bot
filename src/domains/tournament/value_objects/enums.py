@@ -24,9 +24,3 @@ class ApplicationContextType(Enum):
     DISCORD = "discord"
     TELEGRAM = "telegram"
 
-class DeleteStrategy(Enum):
-    """Delete strategy."""
-
-    SOFT = "soft"
-    HARD = "hard"
-

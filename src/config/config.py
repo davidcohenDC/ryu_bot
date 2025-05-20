@@ -60,6 +60,10 @@ def _to_bool(raw: str | None, *, default: bool = False) -> bool:
 # ───────────────────────────────────────────────────────── dataclass ───────────
 @dataclass(slots=True, frozen=True)
 class Settings:
+    """
+    Immutable settings dataclass.
+    Loaded from environment variables at application start.
+    """
     TOKEN: str
     PREFIX: str
     INVITE_LINK: str | None
@@ -89,6 +93,9 @@ class Settings:
     RR_EMOJI_NAMES: list[str]
 
     DEBUG_REACTIONS: bool
+
+    SQL_DB_URI: str
+    SQL_ECHO: bool
 
 
 # ──────────────────────────────────────────────────────── loader fn ────────────
@@ -139,6 +146,9 @@ def load_settings() -> Settings:
 
         # --- flags ----------------------------------------------------------
         DEBUG_REACTIONS=_to_bool(os.getenv("DEBUG_REACTIONS")),
+
+        SQL_DB_URI=_require("SQL_DB_URI"),
+        SQL_ECHO=_to_bool(os.getenv("SQL_ECHO")),
     )
 
 

@@ -4,3 +4,7 @@ discord.py~=2.3.2
 python-dotenv~=1.1.0
 emoji~=2.14.1
 pydantic~=2.11.4
+pymongo~=4.11
+sqlalchemy~=2.0.41
+sqlmodel~=0.0.24
+nanoid~=2.0.0
