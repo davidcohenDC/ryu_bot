@@ -17,8 +17,8 @@ class PhaseDTO(BaseDTO[Phase]):
     rounds:      int      = Field(..., ge=0, description="Number of rounds")
     mode:        MatchMode = Field(..., description="Match mode, e.g., Swiss, Round Robin")
 
-    @classmethod
     @field_validator("rounds")
+    @classmethod
     def positive_rounds(cls, v: int) -> int:
         """
         Checks that the number of rounds is at least 1.

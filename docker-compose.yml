@@ -5,7 +5,7 @@ services:
     env_file:
       - .env
     volumes:
-      - ./database:/bot/database
+      - ./database:/bot/src/database
       - ./discord.log:/bot/discord.log
 
     restart: unless-stopped

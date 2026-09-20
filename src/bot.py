@@ -7,7 +7,7 @@ import discord
 from discord.ext import commands
 from discord.ext.commands import Context
 from dotenv import load_dotenv
-from config import settings
+from src.config import settings
 from src.config.logger import LoggingFormatter
 from src.infrastructure.discord.permissions import WrongChannel, MissingPermission
 from src.utils.embeds import error_embed
@@ -28,7 +28,7 @@ logger.setLevel(logging.INFO)
 console_handler = logging.StreamHandler()
 console_handler.setFormatter(LoggingFormatter())
 # File handler
-file_handler = logging.FileHandler(filename="../discord.log", encoding="utf-8", mode="w")
+file_handler = logging.FileHandler(filename="discord.log", encoding="utf-8", mode="w")
 file_handler_formatter = logging.Formatter(
     "[{asctime}] [{levelname:<8}] {name}: {message}", "%Y-%m-%d %H:%M:%S", style="{"
 )
@@ -201,3 +201,9 @@ class DiscordBot(commands.Bot):
                     title="Wrong Spot!",
                     message=f"You can't cast that here! Use this command in: {', '.join(f'<#{cid}>' for cid in settings.COMMAND_CHANNEL_IDS)}"
                 ))
+
+
+bot = DiscordBot()
+
+if __name__ == "__main__":
+    bot.run(settings.TOKEN)

@@ -16,7 +16,7 @@ def dto_data():
         "mode": MatchMode.BEST_OF_1,
     }
 class TestPhaseDTO:
-    def test_phase_dto_to_from_domain(phase, dto_data):
+    def test_phase_dto_to_from_domain(self, phase, dto_data):
         dto = PhaseDTO(**dto_data)
         domain = dto.to_domain()
         assert isinstance(domain, Phase)
@@ -25,7 +25,7 @@ class TestPhaseDTO:
         assert dto2.phase_order == phase.phase_order
         assert dto2.rounds == phase.rounds
 
-    def test_phase_dto_validation_rounds_negative(dto_data):
+    def test_phase_dto_validation_rounds_negative(self, dto_data):
         dto_data["rounds"] = 0
         with pytest.raises(ValueError):
             PhaseDTO(**dto_data)
