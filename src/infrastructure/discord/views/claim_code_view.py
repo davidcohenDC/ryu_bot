@@ -64,7 +64,7 @@ class ClaimCodeButton(Button):
 
             await interaction.user.send(embed=embed_dm)
         except discord.Forbidden:
-            # User has DMs off — silently fail
+            # User has DMs off, silently fail
             pass
 
 
