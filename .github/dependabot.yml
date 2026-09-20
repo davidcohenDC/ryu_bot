@@ -1,15 +1,6 @@
+# Keeps only the CI itself from rotting: the Python code is frozen on purpose.
 version: 2
 updates:
-  - package-ecosystem: pip
-    directory: /
-    schedule:
-      interval: weekly
-
-  - package-ecosystem: docker
-    directory: /
-    schedule:
-      interval: weekly
-
   - package-ecosystem: github-actions
     directory: /
     schedule:

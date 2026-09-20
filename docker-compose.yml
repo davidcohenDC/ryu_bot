@@ -1,7 +1,7 @@
 services:
   discord-bot:
     build: .
-    image: python-discord-bot
+    image: ryu-bot
     env_file:
       - .env
     volumes:
